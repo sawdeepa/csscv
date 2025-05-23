@@ -15,30 +15,39 @@
 # Note: Exact package names or installation steps might vary depending on your OS distribution and version.
 
 import pyodbc
+import os
 
 # Replace with your actual values
 server = 'x6eps4xrq2xudenlfv6naeo3i4-5k6kabwq66je5j6st3x2vdnzuq.msit-datawarehouse.fabric.microsoft.com'
 database = 'mdeedap'
-authentication = 'ActiveDirectoryInteractive'  # Options: ActiveDirectoryInteractive, ActiveDirectoryPassword, etc.
-# - 'ActiveDirectoryInteractive': Use this for interactive scenarios where a user can sign in via a pop-up window.
-#                                This is suitable when running the script manually.
-# - For automated scripts or backend services, consider alternatives:
-#   - 'ActiveDirectoryServicePrincipal': Uses an Azure AD App Registration (Service Principal) with a client ID and secret or certificate.
-#                                        This is generally recommended for automated flows.
-#                                        Requires additional connection string parameters like 'UID=<app_id>' and 'PWD=<app_secret_or_cert>'.
-#   - 'ActiveDirectoryPassword': Uses Azure AD username and password. Less recommended for automated flows due to security concerns
-#                                with storing passwords. If used, credentials should be handled securely (e.g., environment variables, Azure Key Vault).
-#                                Requires 'UID=<username>' and 'PWD=<password>' in the connection string.
-# This script will use 'ActiveDirectoryInteractive' as currently set. Modify as needed for your environment.
 driver = '{ODBC Driver 17 for SQL Server}'
 
+# Determine authentication method based on environment
+if os.getenv('MSI_ENDPOINT') or os.getenv('IDENTITY_ENDPOINT'):
+    print("Using Managed Identity (ActiveDirectoryMsi) authentication.")
+    authentication = 'ActiveDirectoryMsi'
+    # For Managed Identity, UID and PWD are not needed in the connection string.
+    # The identity of the Azure resource itself is used.
+    # Prerequisites:
+    # 1. Script running on an Azure service supporting Managed Identities (e.g., App Service, VM, Azure Functions).
+    # 2. Managed Identity (System-Assigned or User-Assigned) enabled on the Azure resource.
+    # 3. Managed Identity granted appropriate permissions on the Azure SQL Database.
+else:
+    print("Using Interactive (ActiveDirectoryInteractive) authentication.")
+    authentication = 'ActiveDirectoryInteractive'
+    # 'ActiveDirectoryInteractive': Prompts for Azure AD login. Suitable for local development.
+    # Ensure Azure CLI or other Azure SDK tools are configured for authentication if running locally.
+
 # Connection string for Azure SQL + AAD auth
+# Encrypt=yes is a security best practice.
 conn_str = f'''
 DRIVER={driver};
 SERVER={server};
 DATABASE={database};
 Authentication={authentication};
+Encrypt=yes;
 '''
+print(f"Connection String: {conn_str}") # Optional: for debugging
 
 # Connect and query
 try:
