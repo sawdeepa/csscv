@@ -13,7 +13,43 @@ import asyncio # For asynchronous operations with kernel.invoke
 # but are kept if they were part of the original script structure.
 # import openai # If user's script had this, it would be here.
 # import pyodbc # If user's script had this, it would be here.
-# import pandas as pd # If user's script had this, it would be here.
+import pandas as pd # Added for DataFrame operations
+import openai # Added for the get_embedding function
+
+# --- get_embedding function (Modified for Azure AD Token Auth) ---
+# This function is based on the user-provided snippet, modified as per the subtask.
+def get_embedding(text, azure_ad_token_str: str, azure_endpoint_url: str, deployment_id="text-embedding-3-large", api_version="2024-02-15"):
+    """
+    Generates embeddings for the given text using Azure OpenAI service with Azure AD token authentication.
+
+    Args:
+        text: The input text to embed.
+        azure_ad_token_str: The Azure AD access token string.
+        azure_endpoint_url: The Azure OpenAI service endpoint URL.
+        deployment_id: The name of the embedding model deployment.
+        api_version: The API version for the Azure OpenAI service.
+
+    Returns:
+        The embedding vector for the input text, or None if an error occurs.
+    """
+    # This function authenticates to Azure OpenAI using a passed Azure AD token string (`azure_ad_token_str`)
+    # and the specific service endpoint URL (`azure_endpoint_url`).
+    # These are used to initialize the openai.AzureOpenAI client for token-based authentication.
+    print(f"Attempting to get embedding for text: '{text[:50]}...' using deployment: {deployment_id}")
+    try:
+        client = openai.AzureOpenAI(
+            azure_ad_token=azure_ad_token_str, # Pass the Azure AD token string for authentication.
+            api_version=api_version,
+            azure_endpoint=azure_endpoint_url  # Specify the Azure OpenAI resource endpoint.
+        )
+        
+        response = client.embeddings.create(input=[text], model=deployment_id)
+        embedding = response.data[0].embedding
+        print(f"Successfully retrieved embedding. Vector length: {len(embedding)}")
+        return embedding
+    except Exception as e:
+        print(f"Error in get_embedding: {e}")
+        return None
 
 # Defines the main asynchronous function where the primary script logic resides.
 # Using `async def` allows the use of `await` for asynchronous operations within this function.
@@ -113,6 +149,85 @@ async def main():
     print(f"Script semantic_kernel_invoke_fix.py main() executed. Q: {q}")
     # The original script had a simple print(result) at the end.
     # It's now part of the try/except block or the else clause above.
+
+    # --- Placeholder for CSV loading and embedding generation ---
+    # This section assumes that 'token', 'azure_openai_endpoint', 'embedding_deployment',
+    # 'api_version', 'df', and 'question' are appropriately defined earlier in main().
+    # The following calls to `get_embedding` will use the `token.token` (obtained, for example,
+    # via DefaultAzureCredential) and `azure_openai_endpoint` for Azure AD authentication.
+    
+    # Example: Define placeholder variables for the embedding calls
+    # These would typically be set up based on your application's needs
+    # (e.g., fetching token, loading CSV into a DataFrame, defining the question).
+    
+    # Placeholder for Azure AD token (assuming it's fetched via DefaultAzureCredential or similar)
+    # In a real scenario, this would involve an actual token fetching mechanism.
+    class MockToken: # Mocking a token object
+        def __init__(self, token_str):
+            self.token = token_str
+            
+    # Attempt to get a real token if DefaultAzureCredential was used for the kernel service
+    # This is just for making the example below more functional if a credential was already set up.
+    # If not, it will use a dummy token.
+    actual_token_str = "DUMMY_TOKEN_FOR_EMBEDDING" # Default dummy token
+    if 'credential' in locals() and isinstance(credential, DefaultAzureCredential):
+        try:
+            print("Attempting to fetch a real token for embedding calls...")
+            token_info_for_embedding = await credential.get_token("https://cognitiveservices.azure.com/.default")
+            actual_token_str = token_info_for_embedding.token
+            print("Successfully fetched real token for embedding.")
+        except Exception as e:
+            print(f"Could not fetch real token for embedding, using dummy token: {e}")
+    
+    token = MockToken(actual_token_str) 
+
+    # Use the existing 'endpoint' variable for azure_openai_endpoint if it's suitable,
+    # or define specifically if different for embeddings.
+    azure_openai_endpoint = endpoint # Assuming the same endpoint is used for embeddings
+    embedding_deployment = os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-3-large") # Your embedding model deployment
+    api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15") # API version for embeddings
+
+    # Placeholder for DataFrame (e.g., loaded from a CSV)
+    # df = pd.read_csv("your_data.csv") # Example: df should have a 'question' column
+    data = {'question': ['What is the capital of France?', 'How does photosynthesis work?']}
+    df = pd.DataFrame(data)
+
+    # Placeholder for the current question to be embedded
+    question_from_sk_invoke = str(result) if 'result' in locals() and result else q # Use SK result or initial q
+    question = f"Original question: {q}. Classified intent/result: {question_from_sk_invoke}"
+
+
+    if not df.empty and 'question' in df.columns:
+        print(f"\nUpdating df['embedding'] using get_embedding for {len(df)} rows...")
+        df["embedding"] = df["question"].apply(
+            lambda x: get_embedding(
+                text=x,
+                azure_ad_token_str=token.token,
+                azure_endpoint_url=azure_openai_endpoint,
+                deployment_id=embedding_deployment,
+                api_version=api_version
+            )
+        )
+        print("df['embedding'] updated.")
+        # print(df.head()) # For debugging
+    else:
+        print("Skipping df embedding generation as DataFrame is empty or lacks 'question' column.")
+
+    print(f"\nGenerating embedding for the current question: '{question[:100]}...'")
+    question_embedding = get_embedding(
+        text=question,
+        azure_ad_token_str=token.token,
+        azure_endpoint_url=azure_openai_endpoint,
+        deployment_id=embedding_deployment,
+        api_version=api_version
+    )
+    if question_embedding:
+        print("question_embedding generated successfully.")
+        # print(f"Question embedding (first 5 values): {question_embedding[:5]}") # For debugging
+    else:
+        print("Failed to generate question_embedding.")
+    # --- End of Placeholder for CSV loading and embedding generation ---
+
 
 # Standard Python entry point for asynchronous scripts.
 # `if __name__ == "__main__":` ensures this code runs only when the script is executed directly.
