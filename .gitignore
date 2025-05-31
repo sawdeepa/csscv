@@ -1,0 +1,7 @@
+# Ignore common cache/temp directories
+cache/
+temp/
+tmp/
+
+# Ignore specific large file names if necessary
+*.gguf
