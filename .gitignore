@@ -2,6 +2,7 @@
 cache/
 temp/
 tmp/
+temp_model_data/
 
 # Ignore specific large file names if necessary
 *.gguf
